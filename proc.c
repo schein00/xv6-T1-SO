@@ -139,8 +139,9 @@ growproc(int n)
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
-int fork(int card)
+int fork(int tickets)
 {
+
   int i, pid;
   struct proc *np;
 
@@ -181,6 +182,15 @@ int fork(int card)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+
+
+	if(tickets <= 1){
+		np->tickets = 1;	
+	}else if(tickets >= 10){
+		np->tickets = 10;
+	}else{
+		np->tickets = tickets;	
+	}
 
   release(&ptable.lock);
 
