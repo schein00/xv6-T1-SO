@@ -9,8 +9,9 @@
 #include "memlayout.h"
 
 int main(){
-	for(;;){
-		exit();
+	int i;
+	for(i = 0 ; i < 100; i++){
+		fork((i % 10) + 1);
 	}
 
 }

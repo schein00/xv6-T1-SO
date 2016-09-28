@@ -66,6 +66,12 @@ struct proc {
   int tickets;		       // Variable to inform number of tickets for each program
 };
 
+void Initialize(unsigned int);
+unsigned int Twist(void);
+unsigned int Extract(void);
+
+
+
 // Process memory is laid out contiguously, low addresses first:
 //   text
 //   original data and bss
