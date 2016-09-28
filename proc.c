@@ -7,6 +7,9 @@
 #include "proc.h"
 #include "spinlock.h"
 
+
+int maxTicket = 0;
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -183,13 +186,15 @@ int fork(int tickets)
 
   np->state = RUNNABLE;
 
-
 	if(tickets <= 1){
-		np->tickets = 1;	
+		np->tickets = 1;
+		maxTicket += 1;	
 	}else if(tickets >= 10){
 		np->tickets = 10;
+		maxTicket += 10;
 	}else{
-		np->tickets = tickets;	
+		np->tickets = tickets;
+		maxTicket += tickets;	
 	}
 
   release(&ptable.lock);
@@ -300,39 +305,41 @@ scheduler(void)
 
   for(;;){
    
-	int sum, lot;
+	int sum, lot = 0;
   
-	// FUNÇÃO RANDlot = rand(1 - 	tickets );				
+	// FUNÇÃO RANDlot = rand(1 - 	tickets );
+	Initialize(10);
+	lot = Extract() % maxTicket;				
      
- // Enable interrupts on this processor.
-   sti();
+ 	// Enable interrupts on this processor.
+   	sti();
 			
-    // Loop over process table looking for process to run.
+    	// Loop over process table looking for process to run.
 	sum = 0;
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-				continue;
+    	acquire(&ptable.lock);
+    	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      		if(p->state != RUNNABLE)
+			continue;
 
-			if(p->tickets + sum <= lot )
-				sum+=p->tickets;
-					continue;
-}
+		if(p->tickets + sum <= lot ){
+			sum+=p->tickets;
+			continue;
+		}
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      swtch(&cpu->scheduler, p->context);
-      switchkvm();
+      		// Switch to chosen process.  It is the process's job
+      		// to release ptable.lock and then reacquire it
+      		// before jumping back to us.
+      		proc = p;
+      		switchuvm(p);
+      		p->state = RUNNING;
+      		swtch(&cpu->scheduler, p->context);
+      		switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      proc = 0;
-    }
-    release(&ptable.lock);
+      		// Process is done running for now.
+      		// It should have changed its p->state before coming back.
+    		proc = 0;
+    	}
+    	release(&ptable.lock);
 
   }
 }
@@ -512,8 +519,12 @@ procdump(void)
   }
 }
 
+
 // Random function
 // https://en.wikipedia.org/wiki/Mersenne_Twister
+unsigned int x[624];
+unsigned int index = 0;
+
 void Initialize(unsigned int seed)
 {
     index = 624;
@@ -540,7 +551,7 @@ unsigned int Twist()
     do
     {
         i = (top - 396) % 624;
-        _c = (*j ^ (*j ^ (x[i])) & 0x7FFFFFFF) >> 1;
+        _c = ((*j ^ (*j ^ (x[i]))) & 0x7FFFFFFF) >> 1;
         if ((*j ^ (*j ^ x[i])) & 1)
             _c ^= 0x9908B0DFu;
         _f = top++;
