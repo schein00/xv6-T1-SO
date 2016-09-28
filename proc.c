@@ -299,14 +299,25 @@ scheduler(void)
   struct proc *p;
 
   for(;;){
-    // Enable interrupts on this processor.
-    sti();
-
+   
+	int sum, lot;
+  
+	// FUNÇÃO RANDlot = rand(1 - 	tickets );				
+     
+ // Enable interrupts on this processor.
+   sti();
+			
     // Loop over process table looking for process to run.
+	sum = 0;
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
-        continue;
+				continue;
+
+			if(p->tickets + sum <= lot )
+				sum+=p->tickets;
+					continue;
+}
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
