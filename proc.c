@@ -502,6 +502,7 @@ procdump(void)
 }
 
 // Random function
+// https://en.wikipedia.org/wiki/Mersenne_Twister
 void Initialize(unsigned int seed)
 {
     index = 624;
