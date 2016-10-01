@@ -8,12 +8,13 @@
 #include "spinlock.h"
 
 
-int maxTicket = 0;
 
-struct {
+struct {  
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
+
+
 
 static struct proc *initproc;
 
@@ -41,14 +42,17 @@ allocproc(void)
   struct proc *p;
   char *sp;
 
+  
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == UNUSED)
       goto found;
+  
   return 0;
 
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+ 
 
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
@@ -104,6 +108,7 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  p->tickets = 5;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -170,6 +175,17 @@ int fork(int tickets)
   np->parent = proc;
   *np->tf = *proc->tf;
 
+	if(!tickets)
+		np->tickets = 5;
+	else if(tickets <= 1)
+		np->tickets = 1;
+	else if(tickets >= 10)
+		np->tickets = 10;	
+	else
+		np->tickets = tickets;
+		
+
+
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -186,16 +202,7 @@ int fork(int tickets)
 
   np->state = RUNNABLE;
 
-	if(tickets <= 1){
-		np->tickets = 1;
-		maxTicket += 1;	
-	}else if(tickets >= 10){
-		np->tickets = 10;
-		maxTicket += 10;
-	}else{
-		np->tickets = tickets;
-		maxTicket += tickets;	
-	}
+
 
   release(&ptable.lock);
 
@@ -241,7 +248,7 @@ exit(void)
     }
   }
 
-	maxTicket -= p->tickets;
+	
 
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
@@ -301,47 +308,67 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
+
+int ticketCount(){
+	int count=0;
+	struct proc *p;
+	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+		if(p->state == RUNNABLE){                                  
+			count+=p->tickets;
+		}
+	}
+	return count;
+}
+
 void
 scheduler(void)
 {
   struct proc *p;
+  int sum = 0, lot = 0, count = 0, seed = 1, maxTicket = 0;
 
   for(;;){
-   
-	int sum, lot = 0;
-  
-	// FUNÇÃO RANDlot = rand(1 - 	tickets );
-	Initialize(10);
-	lot = Extract() % maxTicket;				
-     
- 	// Enable interrupts on this processor.
-   	sti();
-			
-    	// Loop over process table looking for process to run.
-	sum = 0;
+	// Enable interrupts on this processor.   	
+	sti();
+	count++;
+	 
+	maxTicket = ticketCount();
+	
+  	if(seed >= 2123456789)
+		seed = 1;
+	if(count >= 200)
+		seed++;
+
+	Initialize(seed);
+	
+	lot = Extract() % maxTicket;
+	
+    	// Loop over process table looking for process to run.y
     	acquire(&ptable.lock);
-    	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      		if(p->state != RUNNABLE)
-			continue;
-
-		if(p->tickets + sum <= lot ){
-			sum+=p->tickets;
-			continue;
+	if(maxTicket > 0){
+    		for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+			sum += p->tickets;      		
+			if(p->state == RUNNABLE){
+				lot -= p->tickets;	
+				if(lot < 0)
+					break;
+			}
 		}
+	
+		
+		// Switch to chosen process.  It is the process's job
+		// to release ptable.lock and then reacquire it
+		// before jumping back to us.
+		proc = p;
+		switchuvm(p);
+		p->state = RUNNING;
+		swtch(&cpu->scheduler, p->context);
+		switchkvm();
+	      	// Process is done running for now.
+	      	// It should have changed its p->state before coming back.
+	    	proc = 0;
+    	
+	}
 
-      		// Switch to chosen process.  It is the process's job
-      		// to release ptable.lock and then reacquire it
-      		// before jumping back to us.
-      		proc = p;
-      		switchuvm(p);
-      		p->state = RUNNING;
-      		swtch(&cpu->scheduler, p->context);
-      		switchkvm();
-
-      		// Process is done running for now.
-      		// It should have changed its p->state before coming back.
-    		proc = 0;
-    	}
     	release(&ptable.lock);
 
   }
