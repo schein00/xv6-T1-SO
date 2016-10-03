@@ -332,11 +332,13 @@ scheduler(void)
 	count++;
 	 
 	maxTicket = ticketCount();
-	
-  	if(seed >= 2123456789)
-		seed = 1;
-	if(count >= 200)
-		seed++;
+	if (count >= 500){
+		if (seed >= 2123456789)
+			seed = 1;
+		if (count >= 200)
+			seed++;
+	}else
+		count++:
 
 	Initialize(seed);
 	
