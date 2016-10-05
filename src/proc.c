@@ -335,7 +335,7 @@ scheduler(void)
 	if (count >= 500){
 		if (seed >= 2123456789)
 			seed = 1;
-		if (count >= 200)
+		else
 			seed++;
 	}else
 		count++:
